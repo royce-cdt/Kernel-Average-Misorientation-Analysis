@@ -3,9 +3,58 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-fnames = ['zero', 'locA_2', 'locA_1', 'locab', 'locB', 'locC', 'locD']
-kam_list = {}
-kam_x_list = {}  # 🔷 Store horizontal averages
+SAMPLE = '133'
+scatterplot = False
+    
+if SAMPLE == '133':
+    fnames = ['zero', 'BLUE', 'FATIGUE'] #ENSURE ZERO IS IN LOCATION 0
+    kam_list = {}
+    kam_x_list = {}  # 🔷 Store horizontal averages
+
+    group1 = [fnames[1]] #corrosion region
+    group2 = [fnames[2]] #fatigue region
+
+    color_map = {
+        fnames[0]: 'mediumseagreen',
+        fnames[1]: 'grey',
+        fnames[2]: 'blue'
+    }
+
+    crack_distance_map = {
+        fnames[1]: 0.2,
+        fnames[2]: 0.5
+    }
+elif SAMPLE == '30':
+    fnames = ['zero', 'locA_2', 'locA_1', 'locab', 'locB', 'locC', 'locD'] #ENSURE ZERO IS IN LOCATION 0
+    kam_list = {}
+    kam_x_list = {}  # 🔷 Store horizontal averages
+
+    group1 = fnames[1:4] #corrosion region
+    group2 = fnames[4:7] #fatigue region
+
+    color_map = {
+        fnames[0]: 'mediumseagreen',
+        fnames[1]: 'grey',
+        fnames[2]: 'silver',
+        fnames[3]: 'green',
+        fnames[4]: 'slateblue',
+        fnames[5]: 'darkorange',
+        fnames[6]: 'gold'
+    }
+
+    crack_distance_map = {
+        fnames[1]: 2.3,
+        fnames[2]: 2.5,
+        fnames[3]: 8.5,
+        fnames[4]: 5.5,
+        fnames[5]: 8.5,
+        fnames[6]: 9.5
+    }
+
+# Binning parameters
+bin_width = 1 # microns
+min_points = 100
+smooth_window = 2
 
 for fname in fnames:
     print(fname)
@@ -23,78 +72,46 @@ for fname in fnames:
     df['kam'] = df['kam'].iloc[::-1].reset_index(drop=True)
     df['gos'] = df['gos'].iloc[::-1].reset_index(drop=True)
 
-    if fname == 'zero':
+    if fname == fnames[0]:
         # 🔹 Compute the mean of the zero binned KAM
         zero_mean_kam = np.nanmean(df['kam'])
+        y_shift = -df['y'].min()
+        df['y_shifted'] = df['y'] + y_shift
+        df['y_zeroed'] = - df['y']
         print(f"Zeropoint mean KAM: {zero_mean_kam:.4f}")
 
 
-    # Load crack edge data
-    crack_edge_path = os.path.join(
-        r"C:\Users\oranm\OneDrive - Imperial College London\PHD\HSSCC\KAM Analysis\results",
-        fname, "distance_from_crack_edge.npy")
-    crack_data = np.load(crack_edge_path, allow_pickle=True).item()
-    distance_um_2d = crack_data['distance_um']
-    height_px = crack_data['height_px']
-    height_um = crack_data['height_um']
+    else:
+        # Load crack edge data
+        crack_edge_path = os.path.join(
+            r"C:\Users\oranm\OneDrive - Imperial College London\PHD\HSSCC\KAM Analysis\results",
+            fname, "distance_from_crack_edge.npy")
+        crack_data = np.load(crack_edge_path, allow_pickle=True).item()
+        distance_um_2d = crack_data['distance_um']
+        height_px = crack_data['height_px']
+        height_um = crack_data['height_um']
 
-    # Pixel size (assuming square pixels)
-    pixel_size_y = height_um / height_px
-    pixel_size_x = pixel_size_y
+        # Pixel size (assuming square pixels)
+        pixel_size_y = height_um / height_px
+        pixel_size_x = pixel_size_y
 
-    # Shift y to positive domain for indexing
-    y_shift = -df['y'].min()
-    df['y_shifted'] = df['y'] + y_shift
-    
-    df = df.dropna(subset=['x', 'y', 'kam'])
-
-
-    # Map to pixel indices
-    
-    df['x_px'] = (df['x'] / pixel_size_x).round().astype(int)
-    df['y_px'] = (df['y_shifted'] / pixel_size_y).round().astype(int)
-    df['y_px'] = df['y_px'].clip(0, distance_um_2d.shape[0] - 1)
-    df['x_px'] = df['x_px'].clip(0, distance_um_2d.shape[1] - 1)
-
-    # Assign crack-relative vertical coordinate
-    df['y_zeroed'] = -distance_um_2d[df['y_px'], df['x_px']]
-    df = df[df['y_zeroed'] > 0]
-    
-    ''' # --- Plot a vertical profile before binning ---
-    if fname == fnames[6]:
-        # Pick one x-column (e.g. the middle one)
-        unique_x = sorted(df['x'].unique())
-        x_val = unique_x[-1]   # choose middle column
-        sub = df[df['x'] == x_val]
-
-        # Plot just this one profile
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            sub['y_zeroed'], sub['kam'],
-            color="steelblue",
-            marker="*",
-            linestyle="None",
-            label=f"x={x_val:.2f}"
-        )
-
-        plt.xlabel("Distance from crack edge (µm)")
-        plt.ylabel("KAM (°)")
-        plt.title(f"Single KAM profile vs distance from crack edge ({fname})")
-        plt.axvline(0, color="k", linestyle="--", label="Crack Edge")
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+        # Shift y to positive domain for indexing
+        y_shift = -df['y'].min()
+        df['y_shifted'] = df['y'] + y_shift
+        
+        df = df.dropna(subset=['x', 'y', 'kam'])
 
 
-    '''
+        # Map to pixel indices
+        
+        df['x_px'] = (df['x'] / pixel_size_x).round().astype(int)
+        df['y_px'] = (df['y_shifted'] / pixel_size_y).round().astype(int)
+        df['y_px'] = df['y_px'].clip(0, distance_um_2d.shape[0] - 1)
+        df['x_px'] = df['x_px'].clip(0, distance_um_2d.shape[1] - 1)
 
-
-
-    # Binning parameters
-    bin_width = 2 #microns
-    min_points = 200
-    smooth_window = 2
+        # Assign crack-relative vertical coordinate
+        df['y_zeroed'] = -distance_um_2d[df['y_px'], df['x_px']]
+        df = df[df['y_zeroed'] > 0]
 
     y_zeroed_min, y_zeroed_max = df['y_zeroed'].min(), df['y_zeroed'].max()
     bins = np.arange(y_zeroed_min, y_zeroed_max + bin_width, bin_width)
@@ -171,45 +188,37 @@ for fname in fnames:
     '''
     #print(f"Number of points per bin {fname}:", [np.sum((df['y_zeroed'] >= bins[i]) & (df['y_zeroed'] < bins[i+1])) for i in range(len(bins)-1)])
 
-    '''
-    # Scatter plot: KAM in original coordinates
-    plt.figure(figsize=(12,6))
-    sc1 = plt.scatter(df['x'], df['y'], c=df['kam'], cmap='viridis', s=0.1)
-    plt.colorbar(sc1, label='KAM (°)')
-    plt.xlabel('x (µm)')
-    plt.ylabel('y (µm)')
-    plt.title(f'KAM in Original Coordinate Space {fname}')
-    plt.gca().invert_yaxis()  # Flip y to match image coordinates if needed
-    plt.gca().invert_xaxis()
-    plt.grid(True)
-
-    # Scatter plot: KAM in crack-referenced coordinates
-    plt.figure(figsize=(12, 6))
-    sc2 = plt.scatter(df['x'], df['y_zeroed'], c=df['kam'], cmap='viridis', s=0.1)
-    plt.colorbar(sc2, label='KAM (°)')
-    plt.xlabel('x (µm)')
-    plt.gca().invert_xaxis()
-    plt.ylabel('Distance from crack edge (µm)')
-    plt.title(f'KAM in Crack-Referenced Coordinate Space {fname}')
-    plt.axhline(0, color='k', linestyle='--', label='Crack Edge')
-    plt.legend()
-    plt.grid(True)
-
-
-    plt.show()
-    '''
+    if scatterplot:
+        # Scatter plot: KAM in original coordinates
+        plt.figure(figsize=(12,6))
+        sc1 = plt.scatter(df['x'], df['y'], c=df['kam'], cmap='viridis', s=0.1)
+        plt.colorbar(sc1, label='KAM (°)')
+        plt.xlabel('x (µm)')
+        plt.ylabel('y (µm)')
+        plt.title(f'KAM in Original Coordinate Space {fname}')
+        plt.gca().invert_yaxis()  # Flip y to match image coordinates if needed
+        plt.gca().invert_xaxis()
+        plt.grid(True)
+    
+        # Scatter plot: KAM in crack-referenced coordinates
+        plt.figure(figsize=(12, 6))
+        sc2 = plt.scatter(df['x'], df['y_zeroed'], c=df['kam'], cmap='viridis', s=0.1)
+        plt.colorbar(sc2, label='KAM (°)')
+        plt.xlabel('x (µm)')
+        plt.gca().invert_xaxis()
+        plt.ylabel('Distance from crack edge (µm)')
+        plt.title(f'KAM in Crack-Referenced Coordinate Space {fname}')
+        plt.axhline(0, color='k', linestyle='--', label='Crack Edge')
+        plt.legend()
+        plt.grid(True)
+    
+    
+        plt.show()
+    
 
 #%% Comparison Plot
-color_map = {
-    'locA_1': 'silver',
-    'locA_2': 'grey',
-    'locab': 'green',
-    'locB': 'slateblue',
-    'locC': 'darkorange',
-    'locD': 'gold',
-    'zero': 'mediumseagreen'
-}
 
+'''
 annotations1 = {
     'locA_2': ("MAP A_2, location = 2.3mm (brittle region)", (33, 0.825)),
     'locA_1': ("MAP A_1, location = 2.5mm (brittle region)", (30, 0.95)),   # (x, y) coords to place text
@@ -220,7 +229,7 @@ annotations1 = {
 }
 
 annotations2 = {}
-'''
+
 plt.figure(figsize=(15, 10))
 
 for fname in fnames:
@@ -302,32 +311,14 @@ plt.show()
 '''
 
 #%% Model Fitting
-import matplotlib.pyplot as plt
-
-
-'''
-
-plt.figure(figsize=(12, 6))
-for fname in fnames:
-    bin_centers, smooth_gos, binned_gos = gos_list[fname]
-    color = color_map.get(fname, 'gray')  # fallback color
-
-    # Plot smoothed and binned with same color, different linestyle
-    plt.plot(bin_centers, smooth_gos, '-', color=color, linewidth=2, label=f'{fname} (smoothed)')
-    plt.plot(bin_centers, binned_gos, '--', color=color, linewidth=1, alpha=0.7, label=f'{fname} (binned)')
-
-plt.xlabel('Distance from crack edge (µm)')
-plt.ylabel('GOS (°)')
-plt.title('GOS vs Distance from Crack Edge')
-plt.axvline(0, color='k', linestyle='--', label='Crack Edge')
-plt.legend()
-plt.grid(True)
-plt.show()
-'''
-
 import numpy as np
 from scipy.optimize import least_squares
 import matplotlib.pyplot as plt
+
+# === CONFIGURATION ===
+fix_y0 = False        # Set to True to fix y0 instead of fitting it
+y0_fixed_value = 0.5  # Used only if fix_y0 = True
+# ======================
 
 def clean_xy(x, y):
     x = np.array(x)
@@ -336,24 +327,19 @@ def clean_xy(x, y):
     return x[mask], y[mask]
 
 def inv_sqrt_model(x, a, y0, c_fixed):
-    return y0 + a**2 / np.sqrt(x * c_fixed)
+    return y0 + a / np.sqrt(x * c_fixed)
 
-def residuals_inv_sqrt(params, x, y, c_fixed):
-    a, y0 = params
+def residuals_inv_sqrt(params, x, y, c_fixed, fix_y0=False, y0_fixed=None):
+    if fix_y0:
+        a = params[0]
+        y0 = y0_fixed
+    else:
+        a, y0 = params
     return inv_sqrt_model(x, a, y0, c_fixed) - y
 
-group1 = ['locA_1', 'locA_2', 'locab']
 
-
-group2 = ['locB', 'locC', 'locD']
-
-# Set bounds to enforce a > 0
-lower_bounds = [0, 0]  # a > 0, y0 unbounded
-upper_bounds = [np.inf, np.inf]
-
-# Assuming kam_list and color_map are defined elsewhere
-# kam_list = {'locA_1': (x_values, y_values), ...}
-# color_map = {'locA_1': 'r', 'locB': 'b', ...}
+lower_bounds = [0, 0] if not fix_y0 else [0]
+upper_bounds = [np.inf, np.inf] if not fix_y0 else [np.inf]
 
 all_bin_centers = []
 for group in [group1, group2]:
@@ -363,69 +349,72 @@ for group in [group1, group2]:
 max_bin_center = max(np.max(bc) for bc in all_bin_centers)
 general_bin_centers = np.linspace(0, max_bin_center, 300)
 
-fig, axes = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-
+fig, axes = plt.subplots(2, 1, figsize=(11, 10), sharex=True)
 
 results = []
-c_fixed = 2*np.pi  # to avoid division by zero
+c_fixed = 2 * np.pi  # avoid division by zero
 
-for ax, group, title in zip(axes, [group1, group2], ['Corrosion-Dominated Region (i)', 'Fatigue-Dominated Region (ii)']):
+for ax, group, title in zip(axes, [group1, group2],
+                            ['Corrosion-Dominated Region (i)', 'Fatigue-Dominated Region (ii)']):
     for fname in group:
         bin_centers, smooth_kam, binned_kam, raw_se = kam_list[fname]
         color = color_map.get(fname, 'gray')
 
-        # Plot smooth data with alpha=0.3
-        ax.plot(bin_centers, smooth_kam, '-', color=color, linewidth=1, label=f'{fname} smoothed data', alpha=0.5)
+        ax.plot(bin_centers, smooth_kam, '-', color=color, linewidth=1,
+                label=f'{fname} smoothed data', alpha=0.5)
 
-        # Clean and restrict to x >= 0
         mask_nonneg = bin_centers >= 0
         xdata = bin_centers[mask_nonneg]
         ydata = binned_kam[mask_nonneg]
         xdata_clean, ydata_clean = clean_xy(xdata, ydata)
-        
+
         if ydata_clean.size == 0:
             print(f"Warning: No valid data points for {fname}, skipping fit.")
-            continue  # Skip this file
+            continue
 
-
-        # Initial parameter guess
+        # Initial guesses
         a_init = max(np.max(ydata_clean) - np.min(ydata_clean), 0.1)
         y0_init = ydata_clean[-1]
-        p0_inv = [a_init, y0_init]
+        p0_inv = [a_init, y0_init] if not fix_y0 else [a_init]
 
-        # Inverse sqrt fit
+        # Fit
         res_inv = least_squares(
-            residuals_inv_sqrt, p0_inv,
-            args=(xdata_clean, ydata_clean, c_fixed),
+            residuals_inv_sqrt,
+            p0_inv,
+            args=(xdata_clean, ydata_clean, c_fixed, fix_y0, y0_fixed_value),
             bounds=(lower_bounds, upper_bounds),
             loss='soft_l1'
         )
 
         if res_inv.success:
-            a_opt, y0_opt = res_inv.x
+            if fix_y0:
+                a_opt = res_inv.x[0]
+                y0_opt = y0_fixed_value
+            else:
+                a_opt, y0_opt = res_inv.x
+
             y_fit = inv_sqrt_model(general_bin_centers, a_opt, y0_opt, c_fixed)
-            
-            # NEW: evaluate fit at 80 µm
             kam_at_80 = inv_sqrt_model(80, a_opt, y0_opt, c_fixed)
-    
+
             ss_res = np.sum((ydata_clean - inv_sqrt_model(xdata_clean, a_opt, y0_opt, c_fixed)) ** 2)
             ss_tot = np.sum((ydata_clean - np.mean(ydata_clean)) ** 2)
-            r2 = 1 - (ss_res / ss_tot)
+            r2 = max(0, 1 - (ss_res / ss_tot))
             rmse = np.sqrt(np.mean((ydata_clean - inv_sqrt_model(xdata_clean, a_opt, y0_opt, c_fixed)) ** 2))
 
             try:
                 J = res_inv.jac
-                cov = np.linalg.pinv(J.T @ J) * np.sum(res_inv.fun**2) / (len(ydata_clean) - len(res_inv.x))
+                cov = np.linalg.pinv(J.T @ J) * np.sum(res_inv.fun ** 2) / (len(ydata_clean) - len(res_inv.x))
                 stderr = np.sqrt(np.diag(cov))
             except np.linalg.LinAlgError:
-                stderr = [np.nan, np.nan]
+                stderr = [np.nan] * len(res_inv.x)
 
-            a_stderr, y0_stderr = stderr
+            a_stderr = stderr[0]
+            y0_stderr = stderr[1] if not fix_y0 else np.nan
 
             ax.plot(general_bin_centers, y_fit, '--', color=color, alpha=0.9,
                     label=f'{fname} inv sqrt fit (R²={r2:.2f})')
         else:
-            a_opt, y0_opt, r2, rmse, a_stderr = [np.nan] * 5
+            a_opt, y0_opt, r2, rmse, a_stderr, y0_stderr, kam_at_80 = [np.nan] * 7
 
         dy_dx = np.gradient(ydata_clean, xdata_clean)
         smoothness = np.std(dy_dx)
@@ -444,33 +433,19 @@ for ax, group, title in zip(axes, [group1, group2], ['Corrosion-Dominated Region
             'KAM_80um': kam_at_80
         })
 
-        # Raw binned data with error bars at alpha=0.3
-        ax.errorbar(
-            bin_centers, binned_kam, yerr=raw_se, fmt='o', color=color,
-            ecolor=color, elinewidth=1, capsize=2, markersize=4, alpha=0.3
-        )
+        ax.errorbar(bin_centers, binned_kam, yerr=raw_se, fmt='o', color=color,
+                    ecolor=color, elinewidth=1, capsize=2, markersize=4, alpha=0.3)
 
-    # Add zeropoint to both plots for context
-    if 'zero' in kam_list:
-        z_bin_centers, z_smooth_kam, _, _ = kam_list['zero']
-        ax.plot(z_bin_centers, z_smooth_kam, 'o', alpha=0.3, color='mediumseagreen', label='zeropoint data', markersize=4)
-        ax.axhline(zero_mean_kam, color='mediumseagreen', label='zeropoint mean', linewidth=2)
-
+    ax.axhline(zero_mean_kam, color='mediumseagreen', label='far-field zeropoint mean', linewidth=2)
     ax.axvline(0, color='k', linestyle='--', label='crack edge')
     ax.set_title(title, weight='bold', fontsize=15)
     ax.set_xlabel('Distance from crack edge (µm)', weight='bold')
     ax.grid(True)
-    ax.set_ylabel('KAM (°)', weight = 'bold')
+    ax.set_ylabel('KAM (°)', weight='bold')
     ax.set_ylim(0.4, 1.5)
-    if ax == axes[0]:
-        ax.legend(loc='right')   # For left half
-    else:
-        ax.legend(loc='upper right')  # For right half
-
-    
+    ax.legend(loc='upper right')
 
 fig.suptitle('Inverse Square Model Fitting to KAM vs Distance from Crack Edge', fontsize=18, weight='bold')
-
 plt.tight_layout()
 plt.show()
 
@@ -483,22 +458,14 @@ for r in results:
           f"{r['R2_inv']:10.3f} {r['RMSE_inv']:10.3f} "
           f"{r['Smoothness']:10.3f} {r['DecayRange']:10.3f} "
           f"{r['KAM_80um']:12.3f}")
-    
+
 print(f'zeropoint mean = {round(zero_mean_kam, 3)}')
+
 
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- Crack distance mapping ---
-crack_distance_map = {
-    'locA_2': 2.3,
-    'locA_1': 2.5,
-    'locab': 4,
-    'locB': 5.5,
-    'locC': 8.5,
-    'locD': 9.5
-}
 
 # --- Extract data from results ---
 crack_dist, a_fits, rmse, r2_vals, fnames, a_stderr_arr = [], [], [], [], [], []
@@ -531,7 +498,7 @@ fnames = fnames[sort_idx]
 a_stderr_arr = a_stderr_arr[sort_idx]
 
 # --- Split fatigue vs hydrogen ---
-fatigue_mask = ~np.isin(fnames, ['locA_1', 'locA_2'])
+fatigue_mask = ~np.isin(fnames, group1)
 sqrt_crack_dist = np.sqrt(crack_dist)
 
 x_fatigue = sqrt_crack_dist[fatigue_mask]
@@ -591,7 +558,7 @@ plt.show()
 print(f'Weighted slope-only fit through origin: slope = {slope_kfit:.3f}, R² = {r_squared:.4f}')
 
 
-# burgers
+# burgers + NYE GND density
 '''
 # Burgers vector for titanium (in microns)
 b = 0.000295  # 0.295 nm -> microns
@@ -618,79 +585,80 @@ plt.tight_layout()
 plt.show()
 '''
 
-# GEOM FACTOR IRWIN
-
+#%% === FATIGUE ΔK CALCULATION (Irwin Geometry Factor with Stress Range) ===
 import numpy as np
 import matplotlib.pyplot as plt
 
-# --- Crack distance mapping ---
-crack_distance_map = {
-    'locA_2': 2.3,
-    'locA_1': 2.5,
-    'locab': 4,
-    'locB': 5.5,
-    'locC': 8.5,
-    'locD': 9.5
-}
+# --- Define fatigue experimental parameters ---
+sigma_max = 560       # MPa (max applied stress)
+sigma_min = 0       # MPa (min applied stress)
+sigma_y = 700         # MPa (yield stress of Ti)
+w_micron = 4500       # Specimen width (µm)
+R_ratio = sigma_min / sigma_max
+stress_range = sigma_max - sigma_min   # Δσ = σ_max - σ_min
 
-def irwin_rp(a_micron, sigma_y, sigma, w_micron, stress_unit='MPa'):
-    a = a_micron * 1e-3 # mm to m
-    w = w_micron * 1e-3 # mm to m
+# --- Irwin geometry factor function ---
+def irwin_rp(a_micron, sigma_y, sigma_range, w_micron, stress_unit='MPa'):
+    a = a_micron * 1e-3  # µm → mm
+    w = w_micron * 1e-3  # µm → mm
     c = a_micron / w_micron
 
+    # Geometry correction factors (Irwin-type)
     MG = 0.1*c**2 + 0.29*c + 1.081
     MB = 0.75*c**2 - 0.185*c + 1.019
     MS = 0.9*c**2 - 0.21*c + 1.02
     Y = MG * MB * MS * (2/np.pi)
 
     if stress_unit == 'MPa':
-        sigma_pa = sigma * 1e6
+        sigma_range_pa = sigma_range * 1e6
         sigma_y_pa = sigma_y * 1e6
     else:
-        sigma_pa = sigma
+        sigma_range_pa = sigma_range
         sigma_y_pa = sigma_y
 
-    K = Y * sigma_pa * np.sqrt(np.pi * a)  # Pa·√m
-    rp_plane_stress = (1/np.pi) * (K / sigma_y_pa)**2
-    rp_plane_strain = (1/(6*np.pi)) * (K / sigma_y_pa)**2
+    # ΔK instead of K
+    deltaK = Y * sigma_range_pa * np.sqrt(np.pi * a)   # Pa·√m
+    rp_plane_stress = (1/np.pi) * (deltaK / sigma_y_pa)**2
+    rp_plane_strain = (1/(6*np.pi)) * (deltaK / sigma_y_pa)**2
 
-    return Y, K / 1e6, rp_plane_stress * 1e6, rp_plane_strain * 1e6
+    return Y, deltaK / 1e6, rp_plane_stress * 1e6, rp_plane_strain * 1e6  # return ΔK in MPa√m, rp in µm
 
-# Parameters for legend
-sigma = 700
-sigma_y = 1000
-w_micron = 1000
+# --- Compute ΔK vs √a ---
+a_vals = np.array(list(crack_distance_map.values()))
+sqrt_a = np.sqrt(a_vals)
+deltaK_vals = np.array([irwin_rp(a, sigma_y, stress_range, w_micron)[1] for a in a_vals])
 
-# ------------------ PLOT 1: K vs sqrt(a) ------------------
-sqrt_a = np.array([np.sqrt(a) for a in crack_distance_map.values()])
-K_vals = np.array([irwin_rp(a, sigma_y, sigma, w_micron)[1] for a in crack_distance_map.values()])
+# Fit ΔK ∝ √a (through origin)
+slope_deltaK = np.sum(sqrt_a * deltaK_vals) / np.sum(sqrt_a**2)
 
-# Compute slope through origin for K vs sqrt(a)
-slope_K = np.sum(sqrt_a * K_vals) / np.sum(sqrt_a**2)
-
-plt.figure()
-plt.plot(sqrt_a, K_vals, 'b^')
-plt.plot([0, np.max(sqrt_a)], [0, slope_K * np.max(sqrt_a)], 'r--', label=f'Slope = {slope_K:.3f} MPa·√m per √mm')
-plt.title('K vs sqrt a')
+# --- Plot ΔK vs √a ---
+plt.figure(figsize=(7,5))
+plt.plot(sqrt_a, deltaK_vals, 'b^', label='ΔK (Irwin)')
+plt.plot([0, np.max(sqrt_a)], [0, slope_deltaK * np.max(sqrt_a)], 'r--',
+         label=f'Linear fit through origin\nSlope = {slope_deltaK:.3f} MPa·√m per √mm')
+plt.title('ΔK vs √(Crack Length) under Fatigue Loading')
 plt.xlabel('√(Crack length) [√mm]')
-plt.ylabel('K [MPa·√m]')
-plt.legend(title=f'σ={sigma} MPa, σ_y={sigma_y} MPa, w={w_micron} μm')
-plt.grid()
+plt.ylabel('ΔK [MPa·√m]')
+plt.legend(title=f'Δσ = {stress_range:.1f} MPa, R = {R_ratio:.2f}, σy = {sigma_y} MPa')
+plt.grid(True)
+plt.tight_layout()
 plt.show()
 
-# ------------------ PLOT 2: Plastic zone vs a ------------------
-a_vals = np.array(list(crack_distance_map.values()))
-rp_ps_vals = np.array([irwin_rp(a, sigma_y, sigma, w_micron)[2] for a in a_vals])
-rp_pe_vals = np.array([irwin_rp(a, sigma_y, sigma, w_micron)[3] for a in a_vals])
+# --- Compute plastic zones for fatigue case ---
+rp_ps_vals = np.array([irwin_rp(a, sigma_y, stress_range, w_micron)[2] for a in a_vals])
+rp_pe_vals = np.array([irwin_rp(a, sigma_y, stress_range, w_micron)[3] for a in a_vals])
 
-plt.figure()
+plt.figure(figsize=(7,5))
 plt.plot(a_vals, rp_ps_vals, 'k^', label='Plane stress')
 plt.plot(a_vals, rp_pe_vals, 'r*', label='Plane strain')
-plt.title('PZ vs a')
-plt.xlabel('Crack length a [mm]')
-plt.ylabel('Plastic zone rp [μm]')
-plt.legend(title=f'σ={sigma} MPa, σ_y={sigma_y} MPa, w={w_micron} μm')
-plt.grid()
+plt.title('Plastic Zone Size vs Crack Length (Fatigue)')
+plt.xlabel('Crack length a [µm]')
+plt.ylabel('Plastic zone radius rp [µm]')
+plt.legend(title='Based on ΔK (stress range)')
+plt.grid(True)
+plt.tight_layout()
 plt.show()
 
-print('Factor difference between K_fit slope and literature: m_K_fit / m_K = ' + str(slope_kfit/slope_K))
+# --- Comparison metric ---
+print(f'Ratio of experimental K_fit slope (from KAM) to fatigue ΔK slope: {slope_kfit / slope_deltaK:.3f}')
+
